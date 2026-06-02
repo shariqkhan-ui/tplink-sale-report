@@ -1,0 +1,12 @@
+{
+  "name": "tplink-sale-report",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "report": "node generate.js"
+  },
+  "dependencies": {
+    "puppeteer": "^24.10.0"
+  }
+}

@@ -1,0 +1,61 @@
+name: Daily TP-Link Funnel Report
+
+on:
+  schedule:
+    - cron: "30 3 * * *" # 09:00 IST (03:30 UTC)
+  workflow_dispatch: {} # allow manual run
+
+permissions:
+  contents: write
+
+jobs:
+  report:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Chromium system libs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+            libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+            libgbm1 libpango-1.0-0 libasound2
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Render report image
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node generate.js
+
+      - name: Commit report image
+        run: |
+          git config user.name "Shariq's Slack Agent"
+          git config user.email "shariq.khan@wiom.in"
+          git add report.png report.html
+          git commit -m "Daily report $(date -u +%Y-%m-%d)" || echo "no changes to commit"
+          git push
+
+      - name: Post report to Slack
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          IMG="https://raw.githubusercontent.com/${{ github.repository }}/main/report.png?v=${{ github.run_id }}"
+          curl -sS -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+            -H "Content-Type: application/json; charset=utf-8" \
+            --data "$(cat <<JSON
+          {
+            "channel": "C0B7L6JJK9C",
+            "text": "<!channel> Please find the TpLink routers overall funnel status as of yesterday. cc <@U077923R68H>",
+            "attachments": [{ "fallback": "TP-Link Router Overall Funnel Status", "image_url": "$IMG", "color": "#E5178F" }]
+          }
+          JSON
+          )"
